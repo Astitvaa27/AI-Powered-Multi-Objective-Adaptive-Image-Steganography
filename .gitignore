@@ -1,0 +1,40 @@
+# Environment
+.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Database backups
+*.sql.bak
+# Project storage / generated data
+storage/dataset/
+storage/reports/
+storage/logs/
+storage/uploads/
+
+# Project storage / generated data
+storage/dataset/
+storage/reports/
+storage/logs/
+storage/uploads/
+storage/payloads/
+storage/stego/
+
+# Older / non-production ML models
+storage/models/bossbase_steganalysis_random_forest.joblib
+storage/models/steganalysis_random_forest.joblib
