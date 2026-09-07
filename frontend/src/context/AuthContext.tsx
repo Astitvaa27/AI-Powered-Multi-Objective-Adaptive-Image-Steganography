@@ -15,6 +15,9 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   userId: string | null;
   signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<authApi.SignupResponse>;
+  verifyOtp: (email: string, otp: string) => Promise<void>;
+  resendOtp: (email: string) => Promise<authApi.MessageResponse>;
   signOut: () => void;
   sessionExpired: boolean;
   clearSessionExpired: () => void;
@@ -65,17 +68,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSessionExpired(false);
   }, []);
 
+  // Creates the account and sends the OTP email. Does not sign the user in —
+  // the account isn't active until the code is verified.
+  const signUp = useCallback((email: string, password: string) => {
+    return authApi.signup(email, password);
+  }, []);
+
+  // Verifies the OTP and, on success, signs the user straight in.
+  const verifyOtp = useCallback(async (email: string, otp: string) => {
+    const result = await authApi.verifyOtp(email, otp);
+    setTokenState(result.access_token);
+    setSessionExpired(false);
+  }, []);
+
+  const resendOtp = useCallback((email: string) => {
+    return authApi.resendOtp(email);
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       token,
       isAuthenticated: Boolean(token),
       userId: readSubject(token),
       signIn,
+      signUp,
+      verifyOtp,
+      resendOtp,
       signOut,
       sessionExpired,
       clearSessionExpired: () => setSessionExpired(false),
     }),
-    [token, signIn, signOut, sessionExpired],
+    [token, signIn, signUp, verifyOtp, resendOtp, signOut, sessionExpired],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

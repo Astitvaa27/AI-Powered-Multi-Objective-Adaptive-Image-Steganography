@@ -26,9 +26,11 @@ from backend.app.models.experiment_run import ExperimentRun
 from backend.app.models.experiment_result import ExperimentResult
 from backend.app.models.audit_log import AuditLog
 from backend.app.models.permission import Permission, RolePermission
+from backend.app.models.otp_code import OTPCode
 
 
 __all__ = [
+    "OTPCode",
     "Role",
     "EmbeddingMethod",
     "Payload",

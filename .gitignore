@@ -38,3 +38,7 @@ storage/stego/
 # Older / non-production ML models
 storage/models/bossbase_steganalysis_random_forest.joblib
 storage/models/steganalysis_random_forest.joblib
+
+# Frontend build output
+dist/
+*.tsbuildinfo

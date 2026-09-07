@@ -7,14 +7,14 @@ import { useTheme } from "@/context/ThemeContext";
 import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Field";
 
-export function LoginPage() {
+export function SignupPage() {
   const navigate = useNavigate();
-  const { signIn, isAuthenticated, sessionExpired, clearSessionExpired } =
-    useAuth();
+  const { signUp, isAuthenticated } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -26,22 +26,31 @@ export function LoginPage() {
     event.preventDefault();
 
     if (!email.trim() || !password) {
-      setError("Enter both your email address and password.");
+      setError("Enter an email address and a password.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
       return;
     }
 
     setSubmitting(true);
     setError(null);
-    clearSessionExpired();
 
     try {
-      await signIn(email.trim(), password);
-      navigate("/", { replace: true });
+      await signUp(email.trim(), password);
+      navigate(`/verify-otp?email=${encodeURIComponent(email.trim())}`);
     } catch (exception) {
       setError(
         exception instanceof ApiError
           ? exception.message
-          : "Sign in failed. Please try again.",
+          : "Sign up failed. Please try again.",
       );
     } finally {
       setSubmitting(false);
@@ -126,20 +135,11 @@ export function LoginPage() {
           </div>
 
           <h2 className="text-xl font-semibold tracking-tight text-fg">
-            Sign in
+            Create your account
           </h2>
           <p className="mt-1 text-xs text-muted">
-            Use the account registered with the analysis backend.
+            We&apos;ll email you a verification code to confirm it&apos;s you.
           </p>
-
-          {sessionExpired && (
-            <div
-              className="mt-5 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2.5 text-xs text-fg"
-              role="status"
-            >
-              Your session expired. Please sign in again.
-            </div>
-          )}
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
             <div>
@@ -156,14 +156,31 @@ export function LoginPage() {
             </div>
 
             <div>
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" hint="min. 8 characters">
+                Password
+              </Label>
               <Input
                 id="password"
                 type="password"
-                autoComplete="current-password"
+                autoComplete="new-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="••••••••"
+                minLength={8}
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="confirmPassword">Confirm password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                placeholder="••••••••"
+                minLength={8}
                 required
               />
             </div>
@@ -178,14 +195,14 @@ export function LoginPage() {
             )}
 
             <Button type="submit" className="w-full" loading={submitting}>
-              Sign in
+              Create account
             </Button>
           </form>
 
-          <p className="mt-6 text-center text-[11px] leading-relaxed text-faint">
-            Don&apos;t have an account?{" "}
-            <Link to="/signup" className="font-medium text-accent hover:underline">
-              Create one
+          <p className="mt-6 text-[11px] leading-relaxed text-faint">
+            Already have an account?{" "}
+            <Link to="/login" className="font-medium text-accent hover:underline">
+              Sign in
             </Link>
           </p>
         </div>

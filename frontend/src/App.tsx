@@ -2,6 +2,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { DashboardPage } from "@/pages/Dashboard";
 import { LoginPage } from "@/pages/Login";
+import { SignupPage } from "@/pages/Signup";
+import { VerifyOtpPage } from "@/pages/VerifyOtp";
 import { ReportDetailPage } from "@/pages/ReportDetail";
 import { ReportsPage } from "@/pages/Reports";
 import { SettingsPage } from "@/pages/Settings";
@@ -20,6 +22,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignupPage />} />
+      <Route path="/verify-otp" element={<VerifyOtpPage />} />
 
       <Route
         path="/"

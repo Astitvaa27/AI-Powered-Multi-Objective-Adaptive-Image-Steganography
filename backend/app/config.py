@@ -23,6 +23,22 @@ class Settings(BaseSettings):
         "http://localhost:4173",
     ]
 
+    # SMTP settings used for signup OTP emails.
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+    SMTP_FROM_NAME: str = "Major Project"
+    SMTP_USE_TLS: bool = True
+
+    # OTP settings.
+    OTP_LENGTH: int = 6
+    OTP_EXPIRE_MINUTES: int = 10
+    OTP_MAX_ATTEMPTS: int = 5
+    OTP_RESEND_COOLDOWN_SECONDS: int = 60
+    DEFAULT_USER_ROLE_NAME: str = "user"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
