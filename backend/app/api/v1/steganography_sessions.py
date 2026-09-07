@@ -10,6 +10,7 @@ from backend.app.models.image import Image
 from backend.app.models.payload import Payload
 from backend.app.models.steganography_session import SteganographySession
 from backend.app.services.lsb_service import embed_lsb
+from backend.app.services.metrics_service import calculate_metrics
 
 
 router = APIRouter(
@@ -91,10 +92,21 @@ def create_steganography_session(
             payload_bytes,
         )
 
+        # embed_lsb() reports embedding data only; distortion metrics
+        # come from the metrics service.
+        metrics = calculate_metrics(
+            str(input_path),
+            str(output_path),
+        )
+
+        result.update(metrics)
+
         session.stego_image_id = None
         session.status = "COMPLETED"
         session.payload_capacity_bytes = result["capacity_bytes"]
-        session.psnr = result["psnr"]
+        session.psnr = (
+            None if result["psnr"] == float("inf") else result["psnr"]
+        )
         session.ssim = result["ssim"]
 
         db.commit()
@@ -107,7 +119,9 @@ def create_steganography_session(
             "payload_size_bytes": result["payload_size_bytes"],
             "capacity_bytes": result["capacity_bytes"],
             "mse": result["mse"],
-            "psnr": result["psnr"],
+            "psnr": (
+                None if result["psnr"] == float("inf") else result["psnr"]
+            ),
             "ssim": result["ssim"],
         }
 

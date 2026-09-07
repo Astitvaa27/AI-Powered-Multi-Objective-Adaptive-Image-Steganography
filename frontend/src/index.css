@@ -1,0 +1,100 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: 248 250 252;
+    --surface: 255 255 255;
+    --elevated: 241 245 249;
+    --line: 226 232 240;
+    --fg: 15 23 42;
+    --muted: 71 85 105;
+    --faint: 148 163 184;
+    --accent: 37 99 235;
+    --accent-soft: 219 234 254;
+    --clean: 15 145 105;
+    --stego: 220 38 38;
+    --warn: 202 138 4;
+  }
+
+  .dark {
+    --bg: 8 11 18;
+    --surface: 15 20 31;
+    --elevated: 23 30 44;
+    --line: 39 48 66;
+    --fg: 226 232 240;
+    --muted: 148 163 184;
+    --faint: 100 116 139;
+    --accent: 56 189 248;
+    --accent-soft: 12 42 62;
+    --clean: 45 212 160;
+    --stego: 248 113 113;
+    --warn: 250 204 21;
+  }
+
+  * {
+    @apply border-line;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-bg text-fg font-sans antialiased;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-bg;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-line;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-faint;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-xl border border-line bg-surface shadow-panel;
+  }
+
+  .skeleton {
+    @apply relative overflow-hidden rounded-md bg-elevated;
+  }
+
+  .skeleton::after {
+    content: "";
+    @apply absolute inset-0 animate-shimmer;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(var(--line) / 0.7),
+      transparent
+    );
+    transform: translateX(-100%);
+  }
+
+  .checkerboard {
+    background-image: linear-gradient(45deg, rgb(var(--line) / 0.5) 25%, transparent 25%),
+      linear-gradient(-45deg, rgb(var(--line) / 0.5) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, rgb(var(--line) / 0.5) 75%),
+      linear-gradient(-45deg, transparent 75%, rgb(var(--line) / 0.5) 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  }
+}
