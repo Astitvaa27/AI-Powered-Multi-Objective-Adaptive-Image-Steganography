@@ -82,3 +82,45 @@ export function checkDatabaseHealth(): Promise<{
 }> {
   return request("/health/db", { anonymous: true });
 }
+
+/**
+ * Always resolves with the same generic message whether or not the email
+ * belongs to an account.
+ */
+export function forgotPassword(email: string): Promise<MessageResponse> {
+  return request<MessageResponse>("/auth/forgot-password", {
+    method: "POST",
+    body: { email },
+    anonymous: true,
+  });
+}
+
+export interface ResetTokenStatus {
+  message: string;
+  expires_at: string;
+}
+
+export function validateResetToken(token: string): Promise<ResetTokenStatus> {
+  return request<ResetTokenStatus>("/auth/reset-password/validate", {
+    method: "POST",
+    body: { token },
+    anonymous: true,
+  });
+}
+
+/** Sets a new password. Every existing session for the account is revoked. */
+export function resetPassword(
+  token: string,
+  newPassword: string,
+  confirmPassword: string,
+): Promise<MessageResponse> {
+  return request<MessageResponse>("/auth/reset-password", {
+    method: "POST",
+    body: {
+      token,
+      new_password: newPassword,
+      confirm_password: confirmPassword,
+    },
+    anonymous: true,
+  });
+}

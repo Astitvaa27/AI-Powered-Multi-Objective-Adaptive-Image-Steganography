@@ -30,7 +30,7 @@ export function Collapsible({
         className="flex w-full items-center justify-between gap-3 px-5 py-3.5 text-left transition-colors hover:bg-elevated/60"
       >
         <span className="min-w-0">
-          <span className="flex items-center gap-2">
+          <span className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-medium text-fg">{title}</span>
             {badge}
           </span>

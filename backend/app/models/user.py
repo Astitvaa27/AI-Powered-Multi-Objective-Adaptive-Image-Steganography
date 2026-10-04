@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -47,6 +47,15 @@ class User(Base):
     email_verified: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
+        nullable=False,
+    )
+
+    # Embedded in access tokens as the "tv" claim. Incrementing it (e.g. on
+    # password reset) invalidates every access token issued before.
+    token_version: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        server_default="0",
         nullable=False,
     )
 

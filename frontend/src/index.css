@@ -4,35 +4,51 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * StegoLab design tokens. Every colour in the app comes from these
+ * variables, so the light and dark themes stay in lockstep.
+ *
+ *   bg / surface / elevated  page, card and inset backgrounds
+ *   line / line-strong       hairline and emphasised borders
+ *   fg / muted / faint       primary, secondary and tertiary text
+ *   accent                   brand + primary actions (indigo)
+ *   clean / stego / warn     semantic: success, danger, caution
+ */
 @layer base {
   :root {
-    --bg: 248 250 252;
+    --bg: 247 248 251;
     --surface: 255 255 255;
-    --elevated: 241 245 249;
-    --line: 226 232 240;
-    --fg: 15 23 42;
-    --muted: 71 85 105;
-    --faint: 148 163 184;
-    --accent: 37 99 235;
-    --accent-soft: 219 234 254;
-    --clean: 15 145 105;
-    --stego: 220 38 38;
-    --warn: 202 138 4;
+    --elevated: 241 243 247;
+    --line: 226 229 236;
+    --line-strong: 205 210 220;
+    --fg: 17 20 32;
+    --muted: 78 85 104;
+    --faint: 120 127 146;
+    --accent: 79 70 229;
+    --accent-hover: 67 56 202;
+    --accent-soft: 238 239 255;
+    --on-accent: 255 255 255;
+    --clean: 4 135 95;
+    --stego: 210 38 48;
+    --warn: 170 110 0;
   }
 
   .dark {
-    --bg: 8 11 18;
-    --surface: 15 20 31;
-    --elevated: 23 30 44;
-    --line: 39 48 66;
-    --fg: 226 232 240;
-    --muted: 148 163 184;
-    --faint: 100 116 139;
-    --accent: 56 189 248;
-    --accent-soft: 12 42 62;
-    --clean: 45 212 160;
+    --bg: 10 12 18;
+    --surface: 17 20 29;
+    --elevated: 25 29 41;
+    --line: 37 42 57;
+    --line-strong: 56 63 82;
+    --fg: 236 238 244;
+    --muted: 164 170 188;
+    --faint: 118 125 144;
+    --accent: 135 145 250;
+    --accent-hover: 165 173 252;
+    --accent-soft: 31 33 68;
+    --on-accent: 10 12 30;
+    --clean: 52 211 153;
     --stego: 248 113 113;
-    --warn: 250 204 21;
+    --warn: 251 191 36;
   }
 
   * {
@@ -46,11 +62,16 @@
   }
 
   body {
-    @apply bg-bg text-fg font-sans antialiased;
+    @apply bg-bg font-sans text-fg antialiased;
+    font-feature-settings: "cv11", "ss01";
   }
 
   :focus-visible {
     @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-bg;
+  }
+
+  ::selection {
+    background: rgb(var(--accent) / 0.25);
   }
 
   ::-webkit-scrollbar {
@@ -61,10 +82,17 @@
     @apply bg-transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply rounded-full bg-line;
+    @apply rounded-full border-2 border-solid border-transparent bg-line-strong bg-clip-padding;
   }
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-faint;
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
@@ -83,18 +111,39 @@
     background: linear-gradient(
       90deg,
       transparent,
-      rgb(var(--line) / 0.7),
+      rgb(var(--line) / 0.8),
       transparent
     );
     transform: translateX(-100%);
   }
 
   .checkerboard {
-    background-image: linear-gradient(45deg, rgb(var(--line) / 0.5) 25%, transparent 25%),
-      linear-gradient(-45deg, rgb(var(--line) / 0.5) 25%, transparent 25%),
-      linear-gradient(45deg, transparent 75%, rgb(var(--line) / 0.5) 75%),
-      linear-gradient(-45deg, transparent 75%, rgb(var(--line) / 0.5) 75%);
-    background-size: 20px 20px;
-    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    background-color: rgb(var(--elevated));
+    background-image: linear-gradient(45deg, rgb(var(--line) / 0.6) 25%, transparent 25%),
+      linear-gradient(-45deg, rgb(var(--line) / 0.6) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, rgb(var(--line) / 0.6) 75%),
+      linear-gradient(-45deg, transparent 75%, rgb(var(--line) / 0.6) 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+  }
+
+  /* Indeterminate progress: honest "working" feedback for single requests. */
+  .progress-indeterminate {
+    @apply relative h-1.5 w-full overflow-hidden rounded-full bg-elevated;
+  }
+
+  .progress-indeterminate::after {
+    content: "";
+    @apply absolute inset-y-0 w-1/3 rounded-full bg-accent;
+    animation: indeterminate 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes indeterminate {
+  0% {
+    left: -35%;
+  }
+  100% {
+    left: 100%;
   }
 }

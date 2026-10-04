@@ -1,58 +1,60 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Moon, ShieldCheck, Sun } from "lucide-react";
+import { MailCheck } from "lucide-react";
 import { ApiError } from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
-import { useTheme } from "@/context/ThemeContext";
 import { useToast } from "@/context/ToastContext";
+import { AuthLayout } from "@/components/layout/AuthLayout";
 import { Button } from "@/components/ui/Button";
-import { Input, Label } from "@/components/ui/Field";
+import { Callout } from "@/components/ui/Callout";
+import { Field, Input } from "@/components/ui/Field";
 
+// Matches the backend's OTP_RESEND_COOLDOWN_SECONDS default.
 const RESEND_COOLDOWN_SECONDS = 60;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function VerifyOtpPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { verifyOtp, resendOtp, isAuthenticated } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const { notify } = useToast();
 
-  const [email, setEmail] = useState(searchParams.get("email") ?? "");
+  const initialEmail = searchParams.get("email") ?? "";
+  const [email, setEmail] = useState(initialEmail);
+  const [editingEmail, setEditingEmail] = useState(!initialEmail);
   const [otp, setOtp] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; otp?: string }>({});
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [resending, setResending] = useState(false);
-  const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS);
-
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // A code was just sent when arriving from signup.
+  const [cooldown, setCooldown] = useState(initialEmail ? RESEND_COOLDOWN_SECONDS : 0);
 
   useEffect(() => {
     if (isAuthenticated) navigate("/", { replace: true });
   }, [isAuthenticated, navigate]);
 
   useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      setCooldown((current) => (current > 0 ? current - 1 : 0));
-    }, 1000);
-
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, []);
+    if (cooldown <= 0) return;
+    const timer = window.setTimeout(() => setCooldown((value) => value - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [cooldown]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (submitting) return;
 
-    if (!email.trim() || otp.trim().length < 4) {
-      setError("Enter your email and the verification code.");
-      return;
-    }
+    const errors: typeof fieldErrors = {};
+    if (!EMAIL_PATTERN.test(email.trim())) errors.email = "Enter the email you signed up with.";
+    if (otp.length !== 6) errors.otp = "Enter all 6 digits from the email.";
+    setFieldErrors(errors);
+    if (errors.email || errors.otp) return;
 
     setSubmitting(true);
     setError(null);
 
     try {
-      await verifyOtp(email.trim(), otp.trim());
+      await verifyOtp(email.trim(), otp);
       navigate("/", { replace: true });
     } catch (exception) {
       setError(
@@ -66,14 +68,20 @@ export function VerifyOtpPage() {
   };
 
   const handleResend = async () => {
-    if (!email.trim() || cooldown > 0) return;
+    if (cooldown > 0 || resending) return;
+
+    if (!EMAIL_PATTERN.test(email.trim())) {
+      setFieldErrors({ email: "Enter your email so we know where to send the code." });
+      setEditingEmail(true);
+      return;
+    }
 
     setResending(true);
     setError(null);
 
     try {
       await resendOtp(email.trim());
-      notify("A new verification code has been sent.", "success");
+      notify("A new code is on its way.", "success");
       setCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (exception) {
       setError(
@@ -87,103 +95,86 @@ export function VerifyOtpPage() {
   };
 
   return (
-    <div className="flex h-full w-full items-center justify-center px-6">
-      <div className="absolute right-5 top-5">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={toggleTheme}
-          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
-          className="h-9 w-9 p-0"
-        >
-          {theme === "dark" ? (
-            <Sun className="h-4 w-4" />
-          ) : (
-            <Moon className="h-4 w-4" />
-          )}
-        </Button>
-      </div>
-
-      <div className="w-full max-w-sm">
-        <div className="mb-8 flex justify-center">
-          <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-accent text-white dark:text-[rgb(var(--bg))]">
-            <ShieldCheck className="h-6 w-6" />
-          </span>
-        </div>
-
-        <h2 className="text-center text-xl font-semibold tracking-tight text-fg">
-          Verify your email
-        </h2>
-        <p className="mt-1 text-center text-xs text-muted">
-          Enter the verification code we sent to your email address. It
-          expires in 10 minutes.
-        </p>
-
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
-          <div>
-            <Label htmlFor="email">Email address</Label>
+    <AuthLayout
+      pageTitle="Verify email"
+      icon={<MailCheck className="h-6 w-6" />}
+      title="Check your email"
+      description={
+        editingEmail ? (
+          "Enter your email and the 6-digit code we sent you."
+        ) : (
+          <>
+            We sent a 6-digit code to{" "}
+            <span className="font-medium text-fg">{email}</span>. It expires in
+            10 minutes.{" "}
+            <button
+              type="button"
+              onClick={() => setEditingEmail(true)}
+              className="font-medium text-accent hover:underline"
+            >
+              Change email
+            </button>
+          </>
+        )
+      }
+      footer={
+        <>
+          Wrong account?{" "}
+          <Link to="/signup" className="font-medium text-accent hover:underline">
+            Start over
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        {editingEmail && (
+          <Field label="Email" error={fieldErrors.email}>
             <Input
-              id="email"
               type="email"
               autoComplete="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="analyst@example.com"
-              required
+              placeholder="you@example.com"
             />
-          </div>
+          </Field>
+        )}
 
-          <div>
-            <Label htmlFor="otp">Verification code</Label>
-            <Input
-              id="otp"
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              value={otp}
-              onChange={(event) =>
-                setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))
-              }
-              placeholder="123456"
-              className="tracking-[0.3em] text-center font-mono"
-              maxLength={6}
-              required
-            />
-          </div>
+        <Field label="Verification code" error={fieldErrors.otp}>
+          <Input
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            value={otp}
+            onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))}
+            placeholder="000000"
+            className="h-12 text-center font-mono text-xl tracking-[0.5em]"
+            maxLength={6}
+            autoFocus={!editingEmail}
+          />
+        </Field>
 
-          {error && (
-            <p
-              className="rounded-lg border border-stego/40 bg-stego/10 px-3 py-2.5 text-xs text-fg"
-              role="alert"
-            >
-              {error}
-            </p>
-          )}
+        {error && (
+          <Callout tone="danger" role="alert">
+            {error}
+          </Callout>
+        )}
 
-          <Button type="submit" className="w-full" loading={submitting}>
-            Verify &amp; continue
-          </Button>
-        </form>
+        <Button type="submit" size="lg" className="w-full" loading={submitting}>
+          Verify and continue
+        </Button>
 
-        <div className="mt-5 text-center text-[11px] text-faint">
-          Didn&apos;t get a code?{" "}
+        <p className="text-center text-sm text-muted">
+          Didn&apos;t get it? Check spam, or{" "}
           <button
             type="button"
-            onClick={handleResend}
+            onClick={() => void handleResend()}
             disabled={cooldown > 0 || resending}
             className="font-medium text-accent hover:underline disabled:cursor-not-allowed disabled:text-faint disabled:no-underline"
           >
-            {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend code"}
+            {cooldown > 0 ? `resend in ${cooldown}s` : resending ? "sending…" : "send a new code"}
           </button>
-        </div>
-
-        <p className="mt-6 text-center text-[11px] leading-relaxed text-faint">
-          Wrong email?{" "}
-          <Link to="/signup" className="font-medium text-accent hover:underline">
-            Start over
-          </Link>
         </p>
-      </div>
-    </div>
+      </form>
+    </AuthLayout>
   );
 }

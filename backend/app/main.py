@@ -1,5 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from backend.app.api.v1.health import router as health_router
@@ -39,6 +43,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """
+    FastAPI's default 422 response echoes the submitted body ("input").
+    For auth routes that would send passwords and reset tokens back over
+    the wire, so the echoed input is dropped there. Other routes keep the
+    default response.
+    """
+    if not request.url.path.startswith("/auth/"):
+        return await request_validation_exception_handler(request, exc)
+
+    errors = [
+        {key: value for key, value in error.items() if key not in {"input", "ctx"}}
+        for error in exc.errors()
+    ]
+
+    return JSONResponse(
+        status_code=422,
+        content={"detail": jsonable_encoder(errors)},
+    )
 
 
 app.include_router(health_router)

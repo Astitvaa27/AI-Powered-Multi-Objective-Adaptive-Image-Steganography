@@ -42,3 +42,6 @@ storage/models/steganalysis_random_forest.joblib
 # Frontend build output
 dist/
 *.tsbuildinfo
+
+# Optional test-only dependencies (see backend/tests/test_auto_extract.py)
+.testdeps/

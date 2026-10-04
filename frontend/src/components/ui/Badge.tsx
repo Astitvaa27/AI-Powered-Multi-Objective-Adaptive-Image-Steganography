@@ -1,29 +1,32 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
-type Tone = "neutral" | "accent" | "clean" | "stego" | "warn";
+export type Tone = "neutral" | "accent" | "clean" | "stego" | "warn";
 
 const TONES: Record<Tone, string> = {
   neutral: "bg-elevated text-muted border-line",
-  accent: "bg-accent-soft text-accent border-accent/30",
-  clean: "bg-clean/10 text-clean border-clean/30",
-  stego: "bg-stego/10 text-stego border-stego/30",
-  warn: "bg-warn/10 text-warn border-warn/30",
+  accent: "bg-accent-soft text-accent border-accent/25",
+  clean: "bg-clean/10 text-clean border-clean/25",
+  stego: "bg-stego/10 text-stego border-stego/25",
+  warn: "bg-warn/10 text-warn border-warn/25",
 };
 
 export function Badge({
   children,
   tone = "neutral",
   className,
+  title,
 }: {
   children: ReactNode;
   tone?: Tone;
   className?: string;
+  title?: string;
 }) {
   return (
     <span
+      title={title}
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wide",
+        "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium",
         TONES[tone],
         className,
       )}
@@ -33,7 +36,7 @@ export function Badge({
   );
 }
 
-/** Maps a backend status string onto a sensible tone. */
+/** Maps a backend status string onto a tone and a readable label. */
 export function statusTone(status: string | null | undefined): Tone {
   switch ((status ?? "").toUpperCase()) {
     case "COMPLETED":
@@ -48,4 +51,10 @@ export function statusTone(status: string | null | undefined): Tone {
     default:
       return "neutral";
   }
+}
+
+export function statusLabel(status: string | null | undefined): string {
+  const value = (status ?? "").toLowerCase();
+  if (!value) return "Unknown";
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }

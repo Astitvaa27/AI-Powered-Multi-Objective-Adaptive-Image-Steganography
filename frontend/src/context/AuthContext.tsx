@@ -9,11 +9,14 @@ import {
 } from "react";
 import * as authApi from "@/api/auth";
 import { getToken, setToken, setUnauthorizedHandler } from "@/api/client";
+import { getUser, type UserProfile } from "@/api/users";
 
 interface AuthContextValue {
   token: string | null;
   isAuthenticated: boolean;
   userId: string | null;
+  /** Account details from the backend; null until loaded. */
+  profile: UserProfile | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<authApi.SignupResponse>;
   verifyOtp: (email: string, otp: string) => Promise<void>;
@@ -44,6 +47,9 @@ function readSubject(token: string | null): string | null {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setTokenState] = useState<string | null>(() => getToken());
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  const userId = readSubject(token);
 
   const signOut = useCallback(() => {
     authApi.logout();
@@ -61,6 +67,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => setUnauthorizedHandler(null);
   }, []);
+
+  useEffect(() => {
+    if (!userId) {
+      setProfile(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    getUser(userId)
+      .then((user) => {
+        if (!cancelled) setProfile(user);
+      })
+      .catch(() => {
+        // Non-critical: the UI falls back to not showing account details.
+        if (!cancelled) setProfile(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const result = await authApi.login(email, password);
@@ -85,20 +113,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return authApi.resendOtp(email);
   }, []);
 
+  const clearSessionExpired = useCallback(() => setSessionExpired(false), []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       token,
       isAuthenticated: Boolean(token),
-      userId: readSubject(token),
+      userId,
+      profile,
       signIn,
       signUp,
       verifyOtp,
       resendOtp,
       signOut,
       sessionExpired,
-      clearSessionExpired: () => setSessionExpired(false),
+      clearSessionExpired,
     }),
-    [token, signIn, signUp, verifyOtp, resendOtp, signOut, sessionExpired],
+    [
+      token,
+      userId,
+      profile,
+      signIn,
+      signUp,
+      verifyOtp,
+      resendOtp,
+      signOut,
+      sessionExpired,
+      clearSessionExpired,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

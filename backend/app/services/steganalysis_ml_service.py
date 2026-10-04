@@ -77,10 +77,19 @@ def load_random_forest():
     return artifact["model"], artifact["feature_names"]
 
 
-def predict_steganography(features: dict) -> dict:
+def predict_steganography(
+    features: dict,
+    loaded_model: tuple | None = None,
+) -> dict:
+    """
+    Classify one feature vector. Callers that score many images can pass
+    the (model, feature_names) tuple from load_random_forest() to avoid
+    reloading the artifact on every call.
+    """
+
     import pandas as pd
 
-    model, feature_names = load_random_forest()
+    model, feature_names = loaded_model or load_random_forest()
 
     X = pd.DataFrame(
         [[float(features[name]) for name in feature_names]],

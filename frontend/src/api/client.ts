@@ -165,6 +165,88 @@ export async function request<T>(
   return parsed as T;
 }
 
+/**
+ * POST a form and read a newline-delimited JSON response, calling onEvent
+ * for each line as it arrives. Errors before the stream starts are thrown
+ * as ApiError, exactly like request().
+ */
+export async function requestNdjson<E>(
+  path: string,
+  options: {
+    formData: FormData;
+    params?: Record<string, string | number | boolean | undefined | null>;
+    onEvent: (event: E) => void;
+    signal?: AbortSignal;
+  },
+): Promise<void> {
+  const url = new URL(`${API_BASE_URL}${path}`);
+  for (const [key, value] of Object.entries(options.params ?? {})) {
+    if (value !== undefined && value !== null && value !== "") {
+      url.searchParams.set(key, String(value));
+    }
+  }
+
+  const headers = new Headers({ Accept: "application/x-ndjson" });
+  const token = getToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  let response: Response;
+
+  try {
+    response = await fetch(url.toString(), {
+      method: "POST",
+      headers,
+      body: options.formData,
+      signal: options.signal,
+    });
+  } catch (exception) {
+    if (exception instanceof DOMException && exception.name === "AbortError") throw exception;
+    throw new ApiError(
+      0,
+      "Cannot reach the backend. Check that the API server is running and that VITE_API_BASE_URL is correct.",
+    );
+  }
+
+  if (!response.ok) {
+    if (response.status === 401) onUnauthorized?.();
+    const parsed = (response.headers.get("content-type") ?? "").includes("application/json")
+      ? await response.json().catch(() => null)
+      : null;
+    throw new ApiError(response.status, readDetail(parsed, response.status), parsed);
+  }
+
+  if (!response.body) {
+    throw new ApiError(0, "The server response could not be read.");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  const flush = (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    try {
+      options.onEvent(JSON.parse(trimmed) as E);
+    } catch {
+      throw new ApiError(0, "The server sent an unreadable progress update.");
+    }
+  };
+
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let newline = buffer.indexOf("\n");
+    while (newline >= 0) {
+      flush(buffer.slice(0, newline));
+      buffer = buffer.slice(newline + 1);
+      newline = buffer.indexOf("\n");
+    }
+  }
+  flush(buffer + decoder.decode());
+}
+
 /** Authenticated blob fetch, used for image previews. */
 export async function requestBlob(path: string): Promise<string> {
   const headers = new Headers();

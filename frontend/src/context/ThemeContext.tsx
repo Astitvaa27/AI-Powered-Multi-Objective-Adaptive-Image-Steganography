@@ -9,59 +9,79 @@ import {
 } from "react";
 
 export type Theme = "light" | "dark";
+export type ThemePreference = Theme | "system";
 
 const STORAGE_KEY = "stegolab.theme";
+const DARK_QUERY = "(prefers-color-scheme: dark)";
 
 interface ThemeContextValue {
+  /** The theme currently applied. */
   theme: Theme;
-  setTheme: (theme: Theme) => void;
+  /** What the user chose; "system" follows the operating system. */
+  preference: ThemePreference;
+  setPreference: (preference: ThemePreference) => void;
   toggleTheme: () => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-function readInitialTheme(): Theme {
+function readPreference(): ThemePreference {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === "light" || stored === "dark") return stored;
   } catch {
-    /* ignore */
+    /* storage unavailable */
   }
+  return "system";
+}
 
-  const prefersLight =
-    typeof window !== "undefined" &&
-    window.matchMedia?.("(prefers-color-scheme: light)").matches;
-
-  return prefersLight ? "light" : "dark";
+function systemTheme(): Theme {
+  return typeof window !== "undefined" && window.matchMedia?.(DARK_QUERY).matches
+    ? "dark"
+    : "light";
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(readInitialTheme);
+  const [preference, setPreferenceState] =
+    useState<ThemePreference>(readPreference);
+  const [system, setSystem] = useState<Theme>(systemTheme);
 
-  // The `dark` class on <html> drives every token in index.css, so the
-  // whole application switches at once.
+  useEffect(() => {
+    const query = window.matchMedia?.(DARK_QUERY);
+    if (!query) return;
+
+    const update = () => setSystem(query.matches ? "dark" : "light");
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  const theme: Theme = preference === "system" ? system : preference;
+
+  // The `dark` class on <html> drives every token in index.css.
   useEffect(() => {
     const root = document.documentElement;
     root.classList.toggle("dark", theme === "dark");
     root.style.colorScheme = theme;
+  }, [theme]);
 
+  const setPreference = useCallback((next: ThemePreference) => {
+    setPreferenceState(next);
     try {
-      localStorage.setItem(STORAGE_KEY, theme);
+      if (next === "system") localStorage.removeItem(STORAGE_KEY);
+      else localStorage.setItem(STORAGE_KEY, next);
     } catch {
       /* preference simply won't persist */
     }
-  }, [theme]);
-
-  const setTheme = useCallback((next: Theme) => setThemeState(next), []);
+  }, []);
 
   const toggleTheme = useCallback(
-    () => setThemeState((current) => (current === "dark" ? "light" : "dark")),
-    [],
+    () => setPreference(theme === "dark" ? "light" : "dark"),
+    [setPreference, theme],
   );
 
   const value = useMemo(
-    () => ({ theme, setTheme, toggleTheme }),
-    [theme, setTheme, toggleTheme],
+    () => ({ theme, preference, setPreference, toggleTheme }),
+    [theme, preference, setPreference, toggleTheme],
   );
 
   return (

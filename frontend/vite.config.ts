@@ -14,11 +14,10 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        // Charting and icons are large and change rarely — split them
-        // out so the app shell stays small and cacheable.
+        // Framework and icons change rarely — split them out so the app
+        // code stays small and cacheable.
         manualChunks: {
           react: ["react", "react-dom", "react-router-dom"],
-          charts: ["recharts"],
           icons: ["lucide-react"],
         },
       },

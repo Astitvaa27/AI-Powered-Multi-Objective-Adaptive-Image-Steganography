@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
@@ -65,6 +66,7 @@ bearer_scheme = HTTPBearer()
 
 def get_current_user_id(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
 ):
     token = credentials.credentials
 
@@ -78,14 +80,33 @@ def get_current_user_id(
                 detail="Invalid authentication token",
             )
 
-        return user_id
-
+        user_uuid = uuid.UUID(str(user_id))
+        # Tokens issued before token versions existed carry no "tv" claim
+        # and are treated as version 0.
+        token_version = int(payload.get("tv", 0))
 
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired authentication token",
         )
+
+    # JWTs are stateless, so revocation works through a per-user version
+    # number: a password reset increments users.token_version, which makes
+    # every token issued before it fail this check.
+    current_version = (
+        db.query(User.token_version)
+        .filter(User.id == user_uuid)
+        .scalar()
+    )
+
+    if current_version is None or current_version != token_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired authentication token",
+        )
+
+    return user_id
 
 def require_role(required_role_id: str):
     def role_checker(

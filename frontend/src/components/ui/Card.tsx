@@ -33,11 +33,13 @@ export function CardHeader({
       )}
     >
       <div className="flex min-w-0 items-start gap-3">
-        {icon && <span className="mt-0.5 text-accent">{icon}</span>}
+        {icon && (
+          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent">
+            {icon}
+          </span>
+        )}
         <div className="min-w-0">
-          <h2 className="truncate text-sm font-semibold tracking-tight text-fg">
-            {title}
-          </h2>
+          <h2 className="text-sm font-semibold text-fg">{title}</h2>
           {description && (
             <p className="mt-0.5 text-xs leading-relaxed text-muted">
               {description}
@@ -45,7 +47,9 @@ export function CardHeader({
           )}
         </div>
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {actions && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+      )}
     </header>
   );
 }

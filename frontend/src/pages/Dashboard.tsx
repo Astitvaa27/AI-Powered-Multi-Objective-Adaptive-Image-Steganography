@@ -1,468 +1,283 @@
-import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  Activity,
-  ArrowRight,
-  Clock,
-  Database,
-  Gauge,
-  Images,
-  Layers,
-  Radar,
-  ShieldHalf,
-  Sparkles,
-} from "lucide-react";
-import { checkDatabaseHealth, checkHealth } from "@/api/auth";
+import { ArrowRight, KeyRound, LockKeyhole, ScanSearch } from "lucide-react";
 import { getActiveModel, getStats, listSessions } from "@/api/steganalysis";
 import { listSteganographySessions } from "@/api/steganography";
-import type {
-  AnalysisSessionSummary,
-  ModelInfo,
-  SteganalysisStats,
-  SteganographySessionSummary,
-} from "@/api/types";
-import { Badge, statusTone } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { Card, CardBody, CardHeader } from "@/components/ui/Card";
-import { MetricCard } from "@/components/MetricCard";
-import { ProgressBar } from "@/components/ui/Progress";
-import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/States";
+import type { AnalysisSessionSummary, SteganographySessionSummary } from "@/api/types";
+import { useAuth } from "@/context/AuthContext";
+import { useAsync } from "@/hooks/useAsync";
+import { methodName } from "@/lib/describe";
+import { formatNumber, formatPercent, formatRelative } from "@/lib/format";
 import { AppLayout } from "@/components/layout/AppLayout";
-import {
-  formatMs,
-  formatNumber,
-  formatPercent,
-  formatRelative,
-} from "@/lib/format";
+import { Badge, statusLabel, statusTone } from "@/components/ui/Badge";
+import { ButtonLink } from "@/components/ui/Button";
+import { Callout } from "@/components/ui/Callout";
+import { Card, CardHeader } from "@/components/ui/Card";
+import { Stat } from "@/components/ui/Stat";
+import { ErrorState, SkeletonRows } from "@/components/ui/States";
 
-interface SystemStatus {
-  api: boolean;
-  database: boolean;
-  model: ModelInfo | null;
-  modelError: string | null;
-}
+const TOOLS = [
+  {
+    to: "/hide",
+    icon: LockKeyhole,
+    title: "Hide a message",
+    text: "Conceal text inside an image. StegoLab picks the least noticeable way to do it.",
+  },
+  {
+    to: "/extract",
+    icon: KeyRound,
+    title: "Extract a message",
+    text: "Read the hidden text back from an image you created.",
+  },
+  {
+    to: "/analyze",
+    icon: ScanSearch,
+    title: "Analyze an image",
+    text: "Estimate whether any image is likely to contain hidden data.",
+  },
+];
 
-export function DashboardPage() {
-  const [stats, setStats] = useState<SteganalysisStats | null>(null);
-  const [sessions, setSessions] = useState<AnalysisSessionSummary[]>([]);
-  const [stegoSessions, setStegoSessions] = useState<
-    SteganographySessionSummary[]
-  >([]);
-  const [system, setSystem] = useState<SystemStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    // Each panel degrades independently — one failing endpoint should not
-    // blank the whole dashboard.
-    const [statsResult, sessionsResult, stegoResult, apiResult, dbResult, modelResult] =
-      await Promise.allSettled([
-        getStats(),
-        listSessions({ limit: 8 }),
-        listSteganographySessions({ limit: 5 }),
-        checkHealth(),
-        checkDatabaseHealth(),
-        getActiveModel(),
-      ]);
-
-    if (statsResult.status === "fulfilled") setStats(statsResult.value);
-    else
-      setError(
-        statsResult.reason instanceof Error
-          ? statsResult.reason.message
-          : "Unable to load dashboard statistics.",
-      );
-
-    if (sessionsResult.status === "fulfilled")
-      setSessions(sessionsResult.value.items);
-
-    if (stegoResult.status === "fulfilled")
-      setStegoSessions(stegoResult.value.items);
-
-    setSystem({
-      api: apiResult.status === "fulfilled",
-      database: dbResult.status === "fulfilled",
-      model: modelResult.status === "fulfilled" ? modelResult.value : null,
-      modelError:
-        modelResult.status === "rejected"
-          ? modelResult.reason instanceof Error
-            ? modelResult.reason.message
-            : "Model unavailable"
-          : null,
-    });
-
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const totalClassified = (stats?.clean_count ?? 0) + (stats?.stego_count ?? 0);
-
-  return (
-    <AppLayout
-      title="Dashboard"
-      subtitle="AI-Powered Multi-Objective Adaptive Image Steganography and Steganalysis Framework"
-    >
-      {error && !stats && (
-        <Card className="mb-6">
-          <ErrorState message={error} onRetry={() => void load()} />
-        </Card>
-      )}
-
-      {/* Quick actions */}
-      <div className="mb-6 grid gap-4 lg:grid-cols-3">
-        <QuickAction
-          to="/steganalysis"
-          icon={<Radar className="h-4 w-4" />}
-          title="Run steganalysis"
-          description="Classify an image as CLEAN or STEGO and rank candidate anomaly regions."
-        />
-        <QuickAction
-          to="/steganography"
-          icon={<ShieldHalf className="h-4 w-4" />}
-          title="Embed a payload"
-          description="Hide a message with LSB, DCT or DWT and measure MSE, PSNR and SSIM."
-        />
-        <QuickAction
-          to="/reports"
-          icon={<Layers className="h-4 w-4" />}
-          title="Browse reports"
-          description="Review previous analysis sessions, predictions and feature vectors."
-        />
-      </div>
-
-      {/* Statistics */}
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {loading && !stats ? (
-          Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="panel h-[6.5rem] p-4">
-              <div className="skeleton h-3 w-24" />
-              <div className="skeleton mt-3 h-7 w-16" />
-            </div>
-          ))
-        ) : (
-          <>
-            <MetricCard
-              label="Total analyses"
-              value={stats?.total_analyses ?? 0}
-              hint={`${stats?.completed_analyses ?? 0} completed · ${
-                stats?.failed_analyses ?? 0
-              } failed`}
-              icon={<Activity className="h-4 w-4" />}
-            />
-            <MetricCard
-              label="Classified STEGO"
-              value={stats?.stego_count ?? 0}
-              tone="stego"
-              hint={
-                totalClassified > 0
-                  ? `${formatPercent(
-                      (stats?.stego_count ?? 0) / totalClassified,
-                      0,
-                    )} of classified images`
-                  : "No classifications yet"
-              }
-              icon={<Radar className="h-4 w-4" />}
-            />
-            <MetricCard
-              label="Classified CLEAN"
-              value={stats?.clean_count ?? 0}
-              tone="clean"
-              hint={
-                totalClassified > 0
-                  ? `${formatPercent(
-                      (stats?.clean_count ?? 0) / totalClassified,
-                      0,
-                    )} of classified images`
-                  : "No classifications yet"
-              }
-              icon={<Sparkles className="h-4 w-4" />}
-            />
-            <MetricCard
-              label="Registered images"
-              value={stats?.total_images ?? 0}
-              hint={`${stats?.total_candidate_regions ?? 0} candidate regions ranked`}
-              icon={<Images className="h-4 w-4" />}
-            />
-          </>
-        )}
-      </div>
-
-      {/* Main grid */}
-      <div className="grid gap-6 xl:grid-cols-3">
-        <Card className="xl:col-span-2">
-          <CardHeader
-            title="Recent steganalysis"
-            description="Latest detection results for your account"
-            icon={<Activity className="h-4 w-4" />}
-            actions={
-              <Link to="/reports">
-                <Button variant="ghost" size="sm">
-                  View all
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Button>
-              </Link>
-            }
-          />
-
-          {loading && sessions.length === 0 && <SkeletonRows rows={5} />}
-
-          {!loading && sessions.length === 0 && (
-            <EmptyState
-              icon={<Radar className="h-5 w-5" />}
-              title="No analyses yet"
-              description="Run your first steganalysis to populate this dashboard."
-              action={
-                <Link to="/steganalysis">
-                  <Button size="sm">Open steganalysis</Button>
-                </Link>
-              }
-            />
-          )}
-
-          {sessions.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-line text-[11px] uppercase tracking-wide text-faint">
-                  <tr>
-                    <th scope="col" className="px-5 py-2.5 font-medium">Image</th>
-                    <th scope="col" className="px-3 py-2.5 font-medium">Result</th>
-                    <th scope="col" className="px-3 py-2.5 font-medium">Confidence</th>
-                    <th scope="col" className="px-3 py-2.5 font-medium">Time</th>
-                    <th scope="col" className="px-5 py-2.5 font-medium">When</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {sessions.map((session) => (
-                    <tr
-                      key={session.analysis_session_id}
-                      className="transition-colors hover:bg-elevated/50"
-                    >
-                      <td className="max-w-[16rem] px-5 py-2.5">
-                        <Link
-                          to={`/reports/${session.analysis_session_id}`}
-                          className="block truncate font-medium text-fg hover:text-accent"
-                          title={session.image_filename ?? undefined}
-                        >
-                          {session.image_filename ?? "Unnamed image"}
-                        </Link>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        {session.predicted_class ? (
-                          <Badge
-                            tone={
-                              session.predicted_class === "STEGO"
-                                ? "stego"
-                                : "clean"
-                            }
-                          >
-                            {session.predicted_class}
-                          </Badge>
-                        ) : (
-                          <Badge tone={statusTone(session.status)}>
-                            {session.status}
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <ProgressBar
-                            value={session.confidence ?? 0}
-                            tone={
-                              session.predicted_class === "STEGO"
-                                ? "stego"
-                                : "clean"
-                            }
-                            className="w-16"
-                          />
-                          <span className="font-mono tabular-nums text-muted">
-                            {formatPercent(session.confidence, 1)}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5 font-mono text-muted">
-                        {formatMs(session.processing_time_ms)}
-                      </td>
-                      <td className="px-5 py-2.5 text-faint">
-                        {formatRelative(session.created_at)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-
-        <div className="space-y-6">
-          <Card>
-            <CardHeader
-              title="System status"
-              description="Backend, database and detection model"
-              icon={<Database className="h-4 w-4" />}
-            />
-            <CardBody className="space-y-3">
-              <StatusRow label="API server" ok={system?.api ?? false} />
-              <StatusRow label="Database" ok={system?.database ?? false} />
-              <StatusRow
-                label="Steganalysis model"
-                ok={Boolean(system?.model)}
-                detail={
-                  system?.model
-                    ? `${system.model.architecture ?? system.model.name} · v${system.model.version}`
-                    : (system?.modelError ?? undefined)
-                }
-              />
-
-              {system?.model && (
-                <div className="rounded-lg border border-line bg-elevated/40 p-3 text-[11px] leading-relaxed text-muted">
-                  <p className="font-medium text-fg">{system.model.name}</p>
-                  <p className="mt-1">
-                    Framework {system.model.framework ?? "—"} · artifact{" "}
-                    {system.model.artifact_available
-                      ? "present"
-                      : "missing on disk"}
-                  </p>
-                  <p className="mt-1.5">
-                    Detection accuracy is payload-dependent; confidence values
-                    describe individual classifications rather than overall
-                    model accuracy.
-                  </p>
-                </div>
-              )}
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardHeader
-              title="Detection averages"
-              description="Across your completed sessions"
-              icon={<Gauge className="h-4 w-4" />}
-            />
-            <CardBody className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-muted">
-                  Mean confidence
-                </p>
-                <p className="mt-1 font-mono text-xl font-semibold tabular-nums text-fg">
-                  {formatPercent(stats?.average_confidence, 1)}
-                </p>
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-muted">
-                  Mean runtime
-                </p>
-                <p className="mt-1 font-mono text-xl font-semibold tabular-nums text-fg">
-                  {formatMs(stats?.average_processing_time_ms)}
-                </p>
-              </div>
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardHeader
-              title="Steganography activity"
-              description="Recent embedding sessions"
-              icon={<ShieldHalf className="h-4 w-4" />}
-            />
-
-            {stegoSessions.length === 0 ? (
-              <EmptyState
-                icon={<Clock className="h-5 w-5" />}
-                title="No embedding runs yet"
-                description="Embed a payload to see quality metrics here."
-                className="py-9"
-              />
-            ) : (
-              <ul className="divide-y divide-line">
-                {stegoSessions.map((session) => (
-                  <li key={session.id} className="px-5 py-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span
-                        className="min-w-0 truncate text-xs font-medium text-fg"
-                        title={session.cover_image_filename ?? undefined}
-                      >
-                        {session.cover_image_filename ?? "Cover image"}
-                      </span>
-                      <Badge tone={statusTone(session.status)}>
-                        {session.status}
-                      </Badge>
-                    </div>
-                    <p className="mt-1 font-mono text-[11px] text-faint">
-                      PSNR {formatNumber(session.psnr, 2)} dB · SSIM{" "}
-                      {formatNumber(session.ssim, 4)} ·{" "}
-                      {formatRelative(session.created_at)}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        </div>
-      </div>
-    </AppLayout>
-  );
-}
-
-function QuickAction({
-  to,
-  icon,
-  title,
-  description,
-}: {
-  to: string;
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}) {
+function ToolCard({ to, icon: Icon, title, text }: (typeof TOOLS)[number]) {
   return (
     <Link
       to={to}
-      className="panel group flex items-start gap-3 p-4 transition-colors hover:border-accent/50"
+      className="group panel flex flex-col p-5 transition-colors hover:border-accent/40 hover:bg-accent-soft/30"
     >
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
-        {icon}
+      <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent-soft text-accent">
+        <Icon className="h-5 w-5" aria-hidden />
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-1.5 text-sm font-medium text-fg">
-          {title}
-          <ArrowRight className="h-3.5 w-3.5 -translate-x-1 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
-        </span>
-        <span className="mt-0.5 block text-xs leading-relaxed text-muted">
-          {description}
-        </span>
+      <span className="mt-4 flex items-center gap-1.5 text-base font-semibold text-fg">
+        {title}
+        <ArrowRight
+          className="h-4 w-4 text-faint transition-transform group-hover:translate-x-0.5 group-hover:text-accent"
+          aria-hidden
+        />
       </span>
+      <span className="mt-1 text-sm leading-relaxed text-muted">{text}</span>
     </Link>
   );
 }
 
-function StatusRow({
-  label,
-  ok,
-  detail,
-}: {
-  label: string;
-  ok: boolean;
-  detail?: string;
-}) {
+function GettingStarted() {
+  const steps = [
+    { title: "Hide a message", text: "Upload a photo, type a message, and let StegoLab choose how to hide it." },
+    { title: "Download and share", text: "Save the new PNG. It looks the same, but carries your text." },
+    { title: "Extract or analyze", text: "Read the message back, or check how detectable it is." },
+  ];
+
   return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="min-w-0">
-        <p className="text-xs font-medium text-fg">{label}</p>
-        {detail && (
-          <p className="truncate text-[11px] text-faint" title={detail}>
-            {detail}
-          </p>
+    <Card className="p-6">
+      <h2 className="text-base font-semibold text-fg">New here? Start in three steps</h2>
+      <ol className="mt-5 grid gap-5 md:grid-cols-3">
+        {steps.map((step, index) => (
+          <li key={step.title} className="flex gap-3">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-semibold text-accent">
+              {index + 1}
+            </span>
+            <span>
+              <span className="block text-sm font-medium text-fg">{step.title}</span>
+              <span className="mt-0.5 block text-sm leading-relaxed text-muted">{step.text}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      <ButtonLink to="/hide" className="mt-6">
+        Hide your first message
+        <ArrowRight className="h-4 w-4" aria-hidden />
+      </ButtonLink>
+    </Card>
+  );
+}
+
+function RecentHidden({ items }: { items: SteganographySessionSummary[] }) {
+  if (items.length === 0) {
+    return <p className="px-5 py-6 text-sm text-muted">Nothing hidden yet.</p>;
+  }
+  return (
+    <ul className="divide-y divide-line">
+      {items.map((session) => (
+        <li key={session.id}>
+          <Link
+            to={session.optimization_run_id ? `/history/hides/${session.optimization_run_id}` : "/history"}
+            className="flex items-center gap-3 px-5 py-3 hover:bg-elevated/50"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium text-fg">
+                {session.cover_image_filename ?? "Image"}
+              </span>
+              <span className="block text-xs text-muted">
+                {session.method ? methodName(session.method) : "—"}
+                {session.psnr !== null && ` · ${formatNumber(session.psnr, 1)} dB`} ·{" "}
+                {formatRelative(session.created_at)}
+              </span>
+            </span>
+            <Badge tone={statusTone(session.status)}>{statusLabel(session.status)}</Badge>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function RecentAnalyses({ items }: { items: AnalysisSessionSummary[] }) {
+  if (items.length === 0) {
+    return <p className="px-5 py-6 text-sm text-muted">No images analyzed yet.</p>;
+  }
+  return (
+    <ul className="divide-y divide-line">
+      {items.map((session) => (
+        <li key={session.analysis_session_id}>
+          <Link
+            to={`/history/analyses/${session.analysis_session_id}`}
+            className="flex items-center gap-3 px-5 py-3 hover:bg-elevated/50"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium text-fg">
+                {session.image_filename ?? "Unnamed image"}
+              </span>
+              <span className="block text-xs text-muted">
+                hidden-data probability {formatPercent(session.probabilities?.STEGO ?? null, 0)} ·{" "}
+                {formatRelative(session.created_at)}
+              </span>
+            </span>
+            {session.predicted_class ? (
+              <Badge tone={session.predicted_class === "STEGO" ? "stego" : "clean"}>
+                {session.predicted_class === "STEGO" ? "Likely hidden" : "Nothing found"}
+              </Badge>
+            ) : (
+              <Badge tone={statusTone(session.status)}>{statusLabel(session.status)}</Badge>
+            )}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function DashboardPage() {
+  const { profile } = useAuth();
+
+  const { data, loading, error, reload } = useAsync(
+    async () => {
+      // Each panel degrades independently; one failing call doesn't blank the page.
+      const [stats, analyses, hidden, model] = await Promise.allSettled([
+        getStats(),
+        listSessions({ limit: 5 }),
+        listSteganographySessions({ limit: 5 }),
+        getActiveModel(),
+      ]);
+
+      if (hidden.status === "rejected" && analyses.status === "rejected") {
+        throw hidden.reason;
+      }
+
+      return {
+        stats: stats.status === "fulfilled" ? stats.value : null,
+        analyses: analyses.status === "fulfilled" ? analyses.value : null,
+        hidden: hidden.status === "fulfilled" ? hidden.value : null,
+        modelAvailable: model.status === "fulfilled",
+      };
+    },
+    [],
+    "Couldn't load your activity.",
+  );
+
+  const hiddenTotal = data?.hidden?.total ?? 0;
+  const analysesTotal = data?.analyses?.total ?? 0;
+  const isNew = Boolean(data?.hidden && data?.analyses) && hiddenTotal === 0 && analysesTotal === 0;
+  const name = profile?.email?.split("@")[0];
+
+  return (
+    <AppLayout
+      title={name ? `Welcome back, ${name}` : "Welcome to StegoLab"}
+      pageTitle="Dashboard"
+      description="What would you like to do?"
+    >
+      <div className="space-y-8">
+        <div className="grid gap-4 md:grid-cols-3">
+          {TOOLS.map((tool) => (
+            <ToolCard key={tool.to} {...tool} />
+          ))}
+        </div>
+
+        {data && !data.modelAvailable && (
+          <Callout tone="warning" title="Image analysis is currently unavailable">
+            No active detection model is registered on the server. Hiding and
+            extracting messages still work.
+          </Callout>
+        )}
+
+        {loading && !data && (
+          <Card>
+            <SkeletonRows rows={4} />
+          </Card>
+        )}
+
+        {error && (
+          <Card>
+            <ErrorState message={error} onRetry={() => void reload()} />
+          </Card>
+        )}
+
+        {isNew && <GettingStarted />}
+
+        {data && !isNew && (
+          <>
+            <section aria-labelledby="overview-heading">
+              <h2 id="overview-heading" className="mb-3 text-base font-semibold text-fg">
+                Your activity
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Stat label="Messages hidden" value={hiddenTotal} />
+                <Stat label="Images analyzed" value={analysesTotal} />
+                {data.stats && (
+                  <>
+                    <Stat
+                      label="Flagged as likely hidden"
+                      value={data.stats.stego_count}
+                      hint={
+                        data.stats.stego_count + data.stats.clean_count > 0
+                          ? `${formatPercent(
+                              data.stats.stego_count / (data.stats.stego_count + data.stats.clean_count),
+                              0,
+                            )} of analyses`
+                          : undefined
+                      }
+                    />
+                    <Stat label="Images in your library" value={data.stats.total_images} />
+                  </>
+                )}
+              </div>
+            </section>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card>
+                <CardHeader
+                  title="Recently hidden"
+                  actions={
+                    <ButtonLink to="/history" variant="ghost" size="sm">
+                      View all
+                      <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                    </ButtonLink>
+                  }
+                />
+                <RecentHidden items={data.hidden?.items ?? []} />
+              </Card>
+              <Card>
+                <CardHeader
+                  title="Recently analyzed"
+                  actions={
+                    <ButtonLink to="/history?tab=analyses" variant="ghost" size="sm">
+                      View all
+                      <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                    </ButtonLink>
+                  }
+                />
+                <RecentAnalyses items={data.analyses?.items ?? []} />
+              </Card>
+            </div>
+          </>
         )}
       </div>
-      <Badge tone={ok ? "clean" : "stego"}>
-        {ok ? "Online" : "Unavailable"}
-      </Badge>
-    </div>
+    </AppLayout>
   );
 }

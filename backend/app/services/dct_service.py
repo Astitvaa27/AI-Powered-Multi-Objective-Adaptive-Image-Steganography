@@ -5,6 +5,20 @@ import numpy as np
 from PIL import Image
 
 
+# OpenCV applies EXIF orientation by default, while Pillow (used for
+# metrics, LSB and DWT) does not. Ignoring it keeps the stego image
+# pixel-aligned with the cover for rotated camera JPEGs.
+_IMREAD_FLAGS = cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION
+
+
+def calculate_dct_capacity(width: int, height: int) -> int:
+    """Return DCT payload capacity in bytes (one bit per 8x8 block)."""
+
+    block_count = (width // 8) * (height // 8)
+
+    return max(0, (block_count - 32) // 8)
+
+
 def embed_dct(
     input_path: str,
     output_path: str,
@@ -17,7 +31,7 @@ def embed_dct(
     One bit is embedded per 8x8 DCT block.
     """
 
-    image = cv2.imread(input_path, cv2.IMREAD_COLOR)
+    image = cv2.imread(input_path, _IMREAD_FLAGS)
 
     if image is None:
         raise ValueError(f"Unable to read image: {input_path}")
@@ -29,8 +43,7 @@ def embed_dct(
     usable_width = width - (width % 8)
     usable_height = height - (height % 8)
 
-    block_count = (usable_width // 8) * (usable_height // 8)
-    capacity_bytes = max(0, (block_count - 32) // 8)
+    capacity_bytes = calculate_dct_capacity(width, height)
 
     if len(payload) > capacity_bytes:
         raise ValueError(
@@ -89,7 +102,7 @@ def extract_dct(
     Extract a payload embedded using embed_dct().
     """
 
-    image = cv2.imread(image_path, cv2.IMREAD_COLOR)
+    image = cv2.imread(image_path, _IMREAD_FLAGS)
 
     if image is None:
         raise ValueError(f"Unable to read image: {image_path}")

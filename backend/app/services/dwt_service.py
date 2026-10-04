@@ -32,6 +32,19 @@ def _bits_to_bytes(bits: list[int]) -> bytes:
     return bytes(output)
 
 
+def calculate_dwt_capacity(width: int, height: int) -> int:
+    """
+    Return DWT payload capacity in bytes.
+
+    A 1-level Haar decomposition yields a ceil(h/2) x ceil(w/2) HH
+    sub-band; one bit is stored per coefficient after a 32-bit header.
+    """
+
+    coefficient_count = ((height + 1) // 2) * ((width + 1) // 2)
+
+    return max(0, (coefficient_count - 32) // 8)
+
+
 def _embed_bit(value: float, bit: int) -> float:
     magnitude = abs(value)
 

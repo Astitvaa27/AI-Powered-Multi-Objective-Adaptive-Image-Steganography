@@ -1,10 +1,27 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>StegoLab — Adaptive Steganography &amp; Steganalysis</title>
-    <meta name="description" content="AI-powered multi-objective adaptive image steganography and steganalysis framework." />
+    <title>StegoLab</title>
+    <meta name="description" content="Hide, extract and detect messages in images." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // Apply the saved theme before first paint to avoid a light/dark flash.
+      (function () {
+        var theme = null;
+        try {
+          theme = localStorage.getItem("stegolab.theme");
+        } catch (e) {}
+        if (theme !== "light" && theme !== "dark") {
+          theme = window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+        }
+        if (theme === "dark") document.documentElement.classList.add("dark");
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

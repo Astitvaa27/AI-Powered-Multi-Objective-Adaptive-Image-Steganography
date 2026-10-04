@@ -167,6 +167,8 @@ export interface CapacityInfo {
 }
 
 export interface EmbedResult {
+  /** Present on responses from the current backend. */
+  mode?: "MANUAL" | "ADAPTIVE";
   session_id: string;
   status: string;
   method: string;
@@ -191,11 +193,183 @@ export interface EmbedResult {
 export interface ExtractResult {
   image_id: string;
   method: string;
+  /** RECORDED when method=AUTO used the method stored on the image. */
+  method_source?: "RECORDED" | "REQUEST";
+  channel_mode?: string | null;
+  lsb_bits?: number | null;
   payload_size_bytes: number;
   payload_text: string;
   is_probably_text: boolean;
   processing_time_ms: number;
 }
+
+/* ---- Automatic detection and extraction ---- */
+
+export type AutoValidation = "VERIFIED" | "PLAUSIBLE" | "UNVERIFIED";
+
+export type AutoExtractStatus =
+  | "VERIFIED"
+  | "PLAUSIBLE"
+  | "AMBIGUOUS"
+  | "UNVERIFIED"
+  | "NOT_FOUND";
+
+export type AutoStageId =
+  | "validate"
+  | "records"
+  | "containers"
+  | "search"
+  | "validate_candidates"
+  | "steganalysis"
+  | "result";
+
+export interface AutoEvidence {
+  check: string;
+  passed: boolean;
+  detail: string;
+}
+
+export interface AutoCandidate {
+  id: string;
+  adapter: string;
+  adapter_name: string;
+  method: string;
+  family: "STEGOLAB" | "EXTERNAL" | "GENERIC";
+  source: "PIXELS" | "FILE_STRUCTURE";
+  configuration: string;
+  parameters: Record<string, string | number | null>;
+  validation: AutoValidation;
+  explanation: string;
+  evidence: AutoEvidence[];
+  notes: string[];
+  requires_key: boolean;
+  key_hint: string | null;
+  payload: {
+    kind: "TEXT" | "BINARY";
+    size_bytes: number;
+    sha256: string;
+    text: string | null;
+    text_truncated: boolean;
+    base64: string | null;
+    detected_type: string | null;
+    archive_entries: string[];
+    truncated: boolean;
+  };
+  also_found_by: { adapter: string; adapter_name: string; configuration: string }[];
+}
+
+export interface AutoMethodTested {
+  id: string;
+  name: string;
+  method: string;
+  family: string;
+  source: string;
+  supported_inputs: string;
+  detection: string;
+  validation_rules: string;
+  required_parameters: string[];
+  limitations: string[];
+  compatibility: string;
+  applicable: boolean;
+  skipped_reason: string | null;
+  configurations_tested: number;
+  configurations_total: number;
+}
+
+export interface AutoAttempt {
+  adapter: string;
+  adapter_name: string;
+  configuration: string | null;
+  outcome: "CANDIDATE" | "REJECTED" | "ERROR" | "SKIPPED" | "NOT_TESTED" | "SUPERSEDED" | "DUPLICATE";
+  reason: string | null;
+}
+
+export interface AutoMetadataFinding {
+  location: string;
+  key: string;
+  text: string;
+  truncated: boolean;
+  standard_key: boolean;
+}
+
+export interface AutoStageRecord {
+  stage: AutoStageId;
+  label: string;
+  status: "completed" | "partial" | "skipped";
+  duration_ms: number;
+  detail: string | null;
+}
+
+export interface AutoExtractResult {
+  image_id: string | null;
+  status: AutoExtractStatus;
+  extraction_succeeded: boolean;
+  summary: string;
+  best_candidate: AutoCandidate | null;
+  candidates: AutoCandidate[];
+  candidates_total: number;
+  metadata_findings: AutoMetadataFinding[];
+  image: {
+    format: string;
+    mime_type: string;
+    width: number;
+    height: number;
+    mode: string;
+    bit_depth: number | null;
+    channels: string[];
+    file_size_bytes: number;
+    sha256: string;
+    lossy: boolean;
+    frame_count: number;
+    pixels_readable: boolean;
+    pixel_note: string | null;
+    trailing_bytes: number;
+  };
+  record: {
+    found: boolean;
+    source?: "IMAGE_RECORD" | "HASH_MATCH";
+    method?: string;
+    channel_mode?: string | null;
+    lsb_bits?: number | null;
+    embedding_mode?: string;
+    payload_hash_available?: boolean;
+  };
+  methods_tested: AutoMethodTested[];
+  attempts: {
+    total: number;
+    by_outcome: Partial<Record<AutoAttempt["outcome"], number>>;
+    details: AutoAttempt[];
+  };
+  steganalysis: {
+    requested: boolean;
+    available: boolean;
+    ran: boolean;
+    predicted_class: string | null;
+    stego_probability: number | null;
+    skipped_reason: string | null;
+    note: string;
+  };
+  warnings: string[];
+  limitations: string[];
+  guidance: string[];
+  ranking_basis: string;
+  time_budget_reached: boolean;
+  stages: AutoStageRecord[];
+  processing_time_ms: number;
+}
+
+export type AutoExtractEvent =
+  | {
+      type: "stage";
+      stage: AutoStageId;
+      label: string;
+      status: "running" | "completed" | "partial" | "skipped";
+      detail: string | null;
+      duration_ms?: number;
+      progress?: { done: number; total: number };
+    }
+  | { type: "result"; result: AutoExtractResult }
+  | { type: "error"; detail: string };
 
 export interface SteganographySessionSummary {
   id: string;
@@ -211,4 +385,96 @@ export interface SteganographySessionSummary {
   processing_time_ms: number | null;
   error_message: string | null;
   created_at: string;
+  method?: string | null;
+  embedding_mode?: "MANUAL" | "ADAPTIVE" | null;
+  optimization_run_id?: string | null;
+}
+
+export type ObjectiveName =
+  | "quality"
+  | "security"
+  | "distortion"
+  | "capacity"
+  | "robustness";
+
+export interface AdaptiveCandidate {
+  key: string;
+  label: string;
+  method: "LSB" | "DCT" | "DWT";
+  parameters: { channel_mode?: string; lsb_bits?: number };
+  /** SKIPPED: payload did not fit. REJECTED: round-trip extraction failed. */
+  status: "EVALUATED" | "SKIPPED" | "REJECTED" | "FAILED" | "PENDING";
+  feasible: boolean;
+  failure_reason: string | null;
+  payload_size_bytes: number;
+  capacity_bytes: number | null;
+  capacity_used_ratio: number | null;
+  extraction_verified: boolean | null;
+  mse: number | null;
+  psnr: number | null;
+  ssim: number | null;
+  change_rate: number | null;
+  max_abs_change: number | null;
+  stego_probability: number | null;
+  steganalysis_class: string | null;
+  robustness_bit_accuracy: number | null;
+  objectives: Partial<Record<ObjectiveName, number>>;
+  score: number | null;
+  rank: number | null;
+  pareto_optimal: boolean | null;
+  selected: boolean;
+  processing_time_ms: number | null;
+  candidate_id?: string;
+}
+
+export interface AdaptiveSteganalysis {
+  requested: boolean;
+  available: boolean;
+  analysis_session_id: string | null;
+  predicted_class: string | null;
+  stego_probability: number | null;
+  confidence: number | null;
+  cover_stego_probability: number | null;
+  error: string | null;
+}
+
+/** The candidate comparison shared by live results and stored runs. */
+export interface AdaptiveComparison {
+  weights: Record<ObjectiveName, number>;
+  objectives_evaluated: ObjectiveName[];
+  candidates: AdaptiveCandidate[];
+  explanation: string[];
+  limitations: string[];
+}
+
+export interface AdaptiveEmbedResult extends EmbedResult, AdaptiveComparison {
+  mode: "ADAPTIVE";
+  selected_method: string;
+  selected_candidate_key: string;
+  selected_label: string;
+  selected_score: number;
+  change_rate: number | null;
+  optimization_run_id: string;
+  algorithm: string;
+  steganalysis: AdaptiveSteganalysis;
+}
+
+/** GET /steganography/adaptive/runs/{id}: a stored adaptive run. */
+export interface AdaptiveRunDetail extends AdaptiveComparison {
+  optimization_run_id: string;
+  status: string;
+  cover_image_id: string;
+  payload_id: string | null;
+  algorithm: string;
+  best_score: number | null;
+  processing_time_ms: number | null;
+  created_at: string;
+  selected_method?: string;
+  selected_candidate_key?: string;
+  selected_parameters?: { channel_mode?: string; lsb_bits?: number };
+  cover_stego_probability?: number | null;
+  steganalysis_available?: boolean;
+  steganography_session_id?: string;
+  stego_image_id?: string;
+  steganalysis?: AdaptiveSteganalysis;
 }

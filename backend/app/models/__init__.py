@@ -27,10 +27,12 @@ from backend.app.models.experiment_result import ExperimentResult
 from backend.app.models.audit_log import AuditLog
 from backend.app.models.permission import Permission, RolePermission
 from backend.app.models.otp_code import OTPCode
+from backend.app.models.password_reset_token import PasswordResetToken
 
 
 __all__ = [
     "OTPCode",
+    "PasswordResetToken",
     "Role",
     "EmbeddingMethod",
     "Payload",
